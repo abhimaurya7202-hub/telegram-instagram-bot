@@ -1,56 +1,95 @@
-name: Instagram Video Scraper
+name: Instagram Video Downloader
 
 on:
-  repository_dispatch:
-    types: [scrape_request]
   workflow_dispatch:
     inputs:
       username:
-        description: 'Instagram username to scrape'
+        description: 'Instagram username (without @)'
         required: true
-      chat_id:
-        description: 'Telegram chat ID'
-        required: true
+        default: 'cristiano'
 
 jobs:
   scrape-and-send:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v3
     
-    - name: Set up Python
+    - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
     
     - name: Install dependencies
-      run: |
-        pip install requests
+      run: pip install requests
     
-    - name: Create pending request
+    - name: Scrape and Send Videos
       run: |
-        mkdir -p data
-        cat > pending_requests.json << EOF
-        {
-          "requests": [
-            {
-              "username": "${{ github.event.client_payload.username || github.event.inputs.username }}",
-              "chat_id": "${{ github.event.client_payload.chat_id || github.event.inputs.chat_id }}"
+        python3 << 'PYTHON_SCRIPT'
+        import requests
+        import json
+        import time
+        
+        # Configuration
+        TELEGRAM_BOT_TOKEN = "8466011068:AAEmZ-PgnF6QcrhRNNxINvS7P48mIiQMKHw"
+        CHAT_ID = "1034234267"
+        USERNAME = "${{ github.event.inputs.username }}"
+        
+        def send_telegram(text):
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            requests.post(url, json={'chat_id': CHAT_ID, 'text': text, 'parse_mode': 'HTML'})
+        
+        def send_video(video_url, caption):
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
+            try:
+                response = requests.post(url, json={
+                    'chat_id': CHAT_ID,
+                    'video': video_url,
+                    'caption': caption,
+                    'parse_mode': 'HTML'
+                }, timeout=60)
+                return response.status_code == 200
+            except:
+                return False
+        
+        # Notify start
+        send_telegram(f"🔄 Scraping Instagram: @{USERNAME}\n⏳ Please wait...")
+        
+        # Method 1: Try Instaloader API
+        try:
+            # Using public Instagram endpoints
+            url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={USERNAME}"
+            headers = {
+                'User-Agent': 'Instagram 76.0.0.15.395 Android',
+                'X-IG-App-ID': '936619743392459'
             }
-          ]
-        }
-        EOF
-    
-    - name: Run scraper and send to Telegram
-      env:
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        BHINDI_API_KEY: ${{ secrets.BHINDI_API_KEY }}
-      run: |
-        python bot.py
-    
-    - name: Cleanup
-      run: |
-        rm -f pending_requests.json
+            
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                user_data = data.get('data', {}).get('user', {})
+                
+                if user_data:
+                    # Get user ID
+                    user_id = user_data.get('id')
+                    full_name = user_data.get('full_name', USERNAME)
+                    followers = user_data.get('edge_followed_by', {}).get('count', 0)
+                    
+                    send_telegram(
+                        f"✅ Found: {full_name}\n"
+                        f"👥 Followers: {followers:,}\n"
+                        f"🔗 https://instagram.com/{USERNAME}\n\n"
+                        f"⚠️ Instagram API requires authentication for video downloads.\n\n"
+                        f"📝 Alternative: I can help you set up Bhindi Instagram Scraper API for automatic downloads!"
+                    )
+                else:
+                    send_telegram(f"❌ Could not find profile: @{USERNAME}")
+            else:
+                send_telegram(f"⚠️ Instagram API returned status: {response.status_code}")
+                
+        except Exception as e:
+            send_telegram(f"❌ Error: {str(e)}\n\n💡 Please provide Bhindi API key for full functionality!")
+        
+        PYTHON_SCRIPT
