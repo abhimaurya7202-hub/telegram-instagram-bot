@@ -1,0 +1,54 @@
+name: Run Telegram Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        description: 'Instagram username'
+        required: true
+        default: 'cristiano'
+
+jobs:
+  download-videos:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: pip install requests
+    
+    - name: Send Telegram notification
+      run: |
+        curl -X POST "https://api.telegram.org/bot8466011068:AAEmZ-PgnF6QcrhRNNxINvS7P48mIiQMKHw/sendMessage" \
+          -H "Content-Type: application/json" \
+          -d '{"chat_id": "1034234267", "text": "🔄 Processing Instagram username: ${{ github.event.inputs.username }}\n\nPlease wait..."}'
+    
+    - name: Process Instagram profile
+      run: |
+        python3 << 'EOF'
+        import requests
+        import json
+        
+        username = "${{ github.event.inputs.username }}"
+        bot_token = "8466011068:AAEmZ-PgnF6QcrhRNNxINvS7P48mIiQMKHw"
+        chat_id = "1034234267"
+        
+        def send_message(text):
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'})
+        
+        # Send profile link
+        send_message(
+            f"✅ Instagram Profile: @{username}\n\n"
+            f"🔗 https://instagram.com/{username}\n\n"
+            f"⚠️ To enable automatic video downloads, I need access to Instagram scraping API.\n\n"
+            f"📝 Please provide your Bhindi API key in the chat, and I'll set it up for you!"
+        )
+        EOF
