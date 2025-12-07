@@ -1,0 +1,37 @@
+name: Bhindi Instagram Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        description: 'Instagram username'
+        required: true
+        default: 'cristiano'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Notify Start
+      run: |
+        curl -X POST "https://api.telegram.org/bot8466011068:AAEmZ-PgnF6QcrhRNNxINvS7P48mIiQMKHw/sendMessage" \
+          -H "Content-Type: application/json" \
+          -d "{\"chat_id\": \"1034234267\", \"text\": \"🔄 Scraping @${{ github.event.inputs.username }} via Bhindi API...\\n⏳ This will take 30-60 seconds\"}"
+    
+    - name: Create Request File
+      run: |
+        echo "${{ github.event.inputs.username }}" > request.txt
+        cat request.txt
+    
+    - name: Upload Request
+      uses: actions/upload-artifact@v3
+      with:
+        name: instagram-request
+        path: request.txt
+    
+    - name: Send Instructions
+      run: |
+        curl -X POST "https://api.telegram.org/bot8466011068:AAEmZ-PgnF6QcrhRNNxINvS7P48mIiQMKHw/sendMessage" \
+          -H "Content-Type: application/json" \
+          -d "{\"chat_id\": \"1034234267\", \"text\": \"✅ Request created for @${{ github.event.inputs.username }}\\n\\n📝 Bhindi agent will now scrape and send videos!\\n\\nWorkflow: https://github.com/abhimaurya7202-hub/telegram-instagram-bot/actions\"}"
