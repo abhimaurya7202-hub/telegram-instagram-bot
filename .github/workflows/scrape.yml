@@ -1,0 +1,56 @@
+name: Instagram Video Scraper
+
+on:
+  repository_dispatch:
+    types: [scrape_request]
+  workflow_dispatch:
+    inputs:
+      username:
+        description: 'Instagram username to scrape'
+        required: true
+      chat_id:
+        description: 'Telegram chat ID'
+        required: true
+
+jobs:
+  scrape-and-send:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        pip install requests
+    
+    - name: Create pending request
+      run: |
+        mkdir -p data
+        cat > pending_requests.json << EOF
+        {
+          "requests": [
+            {
+              "username": "${{ github.event.client_payload.username || github.event.inputs.username }}",
+              "chat_id": "${{ github.event.client_payload.chat_id || github.event.inputs.chat_id }}"
+            }
+          ]
+        }
+        EOF
+    
+    - name: Run scraper and send to Telegram
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        BHINDI_API_KEY: ${{ secrets.BHINDI_API_KEY }}
+      run: |
+        python bot.py
+    
+    - name: Cleanup
+      run: |
+        rm -f pending_requests.json
